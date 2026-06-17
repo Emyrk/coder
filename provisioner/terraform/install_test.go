@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/coder/coder/v2/provisioner/terraform"
 	"github.com/coder/coder/v2/testutil"
@@ -137,28 +137,23 @@ func TestInstall(t *testing.T) {
 	// prevent multiple binaries from being installed, so the function
 	// should perform like a single install.
 	install := func(version *version.Version) string {
-		var wg sync.WaitGroup
-		paths := make(chan string, 8)
-		for i := 0; i < 8; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+		paths := make([]string, 8)
+		var eg errgroup.Group
+		for i := range paths {
+			eg.Go(func() error {
 				p, err := terraform.Install(ctx, log, false, dir, version, "http://"+proxy.listener.Addr().String())
-				assert.NoError(t, err)
-				paths <- p
-			}()
+				if err != nil {
+					return err
+				}
+				paths[i] = p
+				return nil
+			})
 		}
-		go func() {
-			wg.Wait()
-			close(paths)
-		}()
-		var firstPath string
-		for p := range paths {
-			if firstPath == "" {
-				firstPath = p
-			} else {
-				require.Equal(t, firstPath, p, "installs returned different paths")
-			}
+		require.NoError(t, eg.Wait())
+
+		firstPath := paths[0]
+		for _, p := range paths[1:] {
+			require.Equal(t, firstPath, p, "installs returned different paths")
 		}
 		return firstPath
 	}
