@@ -64,37 +64,25 @@ func Test_Start_truncation(t *testing.T) {
 	pc, cmd, err := pty.Start(pty.CommandContext(ctx, cmdCount, argCount...))
 
 	require.NoError(t, err)
-	readDone := make(chan struct{})
-	go func() {
-		defer close(readDone)
-		terminalReader := testutil.NewTerminalReader(t, pc.OutputReader())
-		n := 1
-		for n <= countEnd {
-			want := fmt.Sprintf("%d", n)
-			err := terminalReader.ReadUntilString(ctx, want)
-			assert.NoError(t, err, "want: %s", want)
-			if err != nil {
-				return
-			}
-			n++
-			if (countEnd - n) < 100 {
-				// If the OS buffers the output, the process can exit even if
-				// we're not done reading.  We want to slow our reads so that
-				// if there is a race between reading the data and it being
-				// truncated, we will lose and fail the test.
-				time.Sleep(testutil.IntervalFast)
-			}
-		}
-		// ensure we still get to EOF
-		endB := &bytes.Buffer{}
-		_, err := io.Copy(endB, pc.OutputReader())
-		assert.NoError(t, err)
-	}()
 
 	cmdDone := make(chan error, 1)
 	go func() {
 		cmdDone <- cmd.Wait()
 	}()
+
+	terminalReader := testutil.NewTerminalReader(t, pc.OutputReader())
+	for n := 1; n <= countEnd; n++ {
+		want := fmt.Sprintf("%d", n)
+		err := terminalReader.ReadUntilString(ctx, want)
+		require.NoError(t, err, "want: %s", want)
+		if (countEnd - n) < 100 {
+			// If the OS buffers the output, the process can exit even if
+			// we're not done reading.  We want to slow our reads so that
+			// if there is a race between reading the data and it being
+			// truncated, we will lose and fail the test.
+			time.Sleep(testutil.IntervalFast)
+		}
+	}
 
 	select {
 	case err := <-cmdDone:
@@ -103,12 +91,10 @@ func Test_Start_truncation(t *testing.T) {
 		t.Fatal("cmd.Wait() timed out")
 	}
 
-	select {
-	case <-readDone:
-		// OK!
-	case <-ctx.Done():
-		t.Fatal("read timed out")
-	}
+	// Ensure we still get to EOF after the process exits.
+	endB := &bytes.Buffer{}
+	_, err = io.Copy(endB, pc.OutputReader())
+	require.NoError(t, err)
 }
 
 // Test_Start_cancel_context tests that we can cancel the command context and kill the process.
