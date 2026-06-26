@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-systemd/daemon"
@@ -64,6 +65,7 @@ import (
 	"github.com/coder/coder/v2/cli/config"
 	"github.com/coder/coder/v2/coderd"
 	"github.com/coder/coder/v2/coderd/aibridged"
+	"github.com/coder/coder/v2/coderd/anthropicpoller"
 	"github.com/coder/coder/v2/coderd/authlink"
 	"github.com/coder/coder/v2/coderd/autobuild"
 	"github.com/coder/coder/v2/coderd/database"
@@ -1149,6 +1151,61 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 				// release pool/recorder resources at shutdown.
 				defer aibridgeDaemon.Close()
 				defer unsubscribeProviderReload()
+			}
+
+			// Anthropic self-hosted sandbox poller (PoC).
+			//
+			// Opt-in via three environment variables:
+			//   CODER_ANTHROPIC_ORG_ID         Coder organization UUID this poller serves.
+			//   CODER_ANTHROPIC_ENVIRONMENT_ID Anthropic environment whose work queue we poll.
+			//   CODER_ANTHROPIC_ENVIRONMENT_KEY Bearer token for the Anthropic environment.
+			//
+			// When all three are set, coderd starts one long-poll goroutine
+			// against the Anthropic environment. Claimed work items are routed
+			// to a LogDispatcher that logs metadata but does not yet spawn
+			// workspaces. This is the polling-half demo from the integration
+			// design; the workspace dispatch is a separate slice. See
+			// coderd/anthropicpoller/DESIGN.md.
+			if envID := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_ID"); envID != "" {
+				envKey := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_KEY")
+				orgIDStr := os.Getenv("CODER_ANTHROPIC_ORG_ID")
+				if envKey == "" || orgIDStr == "" {
+					return xerrors.New("CODER_ANTHROPIC_ENVIRONMENT_ID is set; CODER_ANTHROPIC_ENVIRONMENT_KEY and CODER_ANTHROPIC_ORG_ID are also required")
+				}
+				orgID, err := uuid.Parse(orgIDStr)
+				if err != nil {
+					return xerrors.Errorf("parse CODER_ANTHROPIC_ORG_ID: %w", err)
+				}
+				pollerLogger := logger.Named("anthropic.poller")
+				poller, err := anthropicpoller.New(
+					anthropicpoller.OrgConfig{
+						OrgID:          orgID,
+						EnvironmentID:  envID,
+						EnvironmentKey: envKey,
+					},
+					anthropic.NewClient(),
+					&anthropicpoller.LogDispatcher{Logger: pollerLogger.Named("dispatcher")},
+					pollerLogger,
+				)
+				if err != nil {
+					return xerrors.Errorf("create anthropic poller: %w", err)
+				}
+				pollerCtx, pollerCancel := context.WithCancel(ctx)
+				pollerDone := make(chan struct{})
+				go func() {
+					defer close(pollerDone)
+					if runErr := poller.Run(pollerCtx); runErr != nil {
+						pollerLogger.Error(pollerCtx, "anthropic poller exited with error", slog.Error(runErr))
+					}
+				}()
+				defer func() {
+					pollerCancel()
+					select {
+					case <-pollerDone:
+					case <-time.After(5 * time.Second):
+						pollerLogger.Warn(ctx, "anthropic poller did not drain within 5s of shutdown")
+					}
+				}()
 			}
 
 			if vals.Prometheus.Enable {

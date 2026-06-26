@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/anthropics/anthropic-sdk-go"
+
+	"cdr.dev/slog/v3"
 )
 
 // WorkspaceDispatcher is the boundary between the poller and the coderd
@@ -41,5 +43,27 @@ type NoopDispatcher struct {
 // Dispatch implements WorkspaceDispatcher.
 func (d *NoopDispatcher) Dispatch(_ context.Context, work *anthropic.BetaSelfHostedWork) error {
 	d.Received = append(d.Received, work)
+	return nil
+}
+
+// LogDispatcher logs each claimed work item to the provided slog Logger
+// with the metadata keys broken out for easy demo observation. It does
+// not create workspaces. Intended as the bootstrap dispatcher for the
+// polling-only PoC phase, before the real workspace creation lands.
+type LogDispatcher struct {
+	Logger slog.Logger
+}
+
+// Dispatch implements WorkspaceDispatcher.
+func (d *LogDispatcher) Dispatch(ctx context.Context, work *anthropic.BetaSelfHostedWork) error {
+	fields := []slog.Field{
+		slog.F("work_id", work.ID),
+		slog.F("session_id", work.Data.ID),
+		slog.F("environment_id", work.EnvironmentID),
+		slog.F("state", string(work.State)),
+		slog.F("created_at", work.CreatedAt),
+		slog.F("metadata", work.Metadata),
+	}
+	d.Logger.Info(ctx, "anthropic session work item received (LogDispatcher, no workspace created)", fields...)
 	return nil
 }
