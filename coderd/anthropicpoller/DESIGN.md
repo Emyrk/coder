@@ -352,6 +352,30 @@ Opinionated, in order:
 
 7. **Surface in the AI Tasks UI.** Whatever architecture we pick, the user-visible artifact should be a "Task" (`coderd/aitasks.go`). The user sees a Claude-driven task, with status, logs, and a "stop" button. The plumbing underneath can be sidecar, in-process, or webhooks.
 
+## 9. AI Bridge / gateway routing: out of scope
+
+Decision: this PoC's Anthropic SDK clients (work poller + sessions service) bypass Coder's AI Bridge (`aibridge`, `aibridgedserver`, the `/api/v2/aibridge` and `/api/v2/ai-gateway` HTTP surfaces) and call `api.anthropic.com` directly.
+
+Why bypass is correct for the PoC:
+
+- The Anthropic provider in `aibridge/provider/anthropic.go` allowlists only `/v1/messages` as a bridged route and `/v1/models`, `/v1/messages/count_tokens`, `/api/event_logging/` as passthrough routes. The self-hosted-sandbox surface (`/v1/sessions`, `/v1/agents`, `/v1/environments/{env_id}/work/...`) hits the bridge's catch-all 404 today.
+- Even if we added those routes, the work-queue piece is an awkward fit. `/work/poll?block_ms=999` is a ~10-second long-poll; the bridge's request lifecycle is built around bounded `/v1/messages` calls and is not currently tuned for idle-blocking proxies.
+- The work-queue auth scheme is the env key (`sk-ant-oat01-...`), not a standard `sk-ant-api03-...` key. The bridge today maps a Coder-issued `ANTHROPIC_AUTH_TOKEN` to a user-scoped Anthropic API key. Threading a separate org-scoped credential class through the bridge is a real model change, not a config tweak.
+- Bridge today expects "workspace agent calls bridge". The poller is "coderd calls bridge", a different caller class with no current auth handshake.
+
+What the bypass costs (acknowledged tradeoffs):
+
+- No bridge-mediated audit of `/v1/sessions` or `/v1/agents` calls.
+- Per-user Anthropic API keys live in `user_secrets` rather than the bridge's `keypool`, creating a parallel BYOK storage path for this one feature.
+- The env key lives in the coderd process env (via `CODER_ANTHROPIC_ENVIRONMENT_KEY`) rather than in any Coder-managed secret store.
+
+Follow-up options (not in this PoC):
+
+- **Light:** point the sessions service at `aibridge/keypool` for per-user Anthropic key retrieval, replacing the `user_secrets` lookup. Sessions/agents endpoints stay direct, but BYOK storage consolidates. Smallest move that aligns this feature with the rest of the Anthropic story in Coder.
+- **Full:** extend the Anthropic provider in `aibridge/provider` with `/v1/sessions` and `/v1/agents` bridged routes, then have the sessions service speak HTTP to AI Bridge instead of the Anthropic SDK. Leave the poller direct because of the long-poll + env-key impedance mismatch.
+
+If either follow-up is later picked up, the SDK client constructor lives in one place (`cli/server.go`, `anthropicClientOpts`). `CODER_ANTHROPIC_BASE_URL` already exists as the override knob to point at a bridge instead of `api.anthropic.com`.
+
 ## Appendix: raw source notes
 
 ### Anthropic docs
