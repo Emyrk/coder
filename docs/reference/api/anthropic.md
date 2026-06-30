@@ -110,3 +110,58 @@ curl -X POST http://coder-server:8080/api/v2/anthropic/{organization}/sessions/{
 | 201    | [Created](https://tools.ietf.org/html/rfc7231#section-6.3.2) | Created     | [codersdk.AnthropicSession](schemas.md#codersdkanthropicsession) |
 
 To perform this operation, you must be authenticated. [Learn more](authentication.md).
+
+## Send an event to an Anthropic session
+
+### Code samples
+
+```shell
+# Example request using curl
+curl -X POST http://coder-server:8080/api/v2/anthropic/{organization}/sessions/{user}/{session}/events \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Coder-Session-Token: API_KEY'
+```
+
+`POST /api/v2/anthropic/{organization}/sessions/{user}/{session}/events`
+
+> Body parameter
+
+```json
+{
+  "text": "string"
+}
+```
+
+### Parameters
+
+| Name           | In   | Type                                                                               | Required | Description              |
+|----------------|------|------------------------------------------------------------------------------------|----------|--------------------------|
+| `organization` | path | string                                                                             | true     | Organization ID          |
+| `user`         | path | string                                                                             | true     | User ID, username, or me |
+| `session`      | path | string                                                                             | true     | Anthropic session ID     |
+| `body`         | body | [codersdk.SendAnthropicEventRequest](schemas.md#codersdksendanthropiceventrequest) | true     | Send event request       |
+
+### Example responses
+
+> 200 Response
+
+```json
+{
+  "events": [
+    {
+      "id": "string",
+      "processed_at": "2019-08-24T14:15:22Z",
+      "type": "string"
+    }
+  ]
+}
+```
+
+### Responses
+
+| Status | Meaning                                                 | Description | Schema                                                                               |
+|--------|---------------------------------------------------------|-------------|--------------------------------------------------------------------------------------|
+| 200    | [OK](https://tools.ietf.org/html/rfc7231#section-6.3.1) | OK          | [codersdk.SendAnthropicEventResponse](schemas.md#codersdksendanthropiceventresponse) |
+
+To perform this operation, you must be authenticated. [Learn more](authentication.md).

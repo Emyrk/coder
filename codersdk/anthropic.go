@@ -91,3 +91,28 @@ var AnthropicReservedMetadataKeys = []string{
 	"coder_organization_id",
 	"coder_template_id",
 }
+
+// SendAnthropicEventRequest is the body for the POST send-event
+// endpoint. The first slice supports text-only user messages; richer
+// content types (images, tool confirmations, interrupts) land in a
+// follow-up without a wire-shape break by adding optional fields.
+type SendAnthropicEventRequest struct {
+	// Text is the body of the user message. Required, non-empty.
+	Text string `json:"text" validate:"required"`
+}
+
+// AnthropicEvent is the Coder-facing projection of a session event
+// acknowledged by Anthropic. Only the fields the UI needs to confirm
+// receipt are surfaced; the full event payload stays inside Anthropic.
+type AnthropicEvent struct {
+	ID          string    `json:"id"`
+	Type        string    `json:"type"`
+	ProcessedAt time.Time `json:"processed_at" format:"date-time"`
+}
+
+// SendAnthropicEventResponse is the response shape for the send-event
+// endpoint. Anthropic returns an array of events because a single
+// request may carry multiple events; today coderd only sends one.
+type SendAnthropicEventResponse struct {
+	Events []AnthropicEvent `json:"events"`
+}

@@ -1919,6 +1919,66 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v2/anthropic/{organization}/sessions/{user}/{session}/events": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Anthropic"
+                ],
+                "summary": "Send an event to an Anthropic session",
+                "operationId": "send-anthropic-event",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Organization ID",
+                        "name": "organization",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User ID, username, or me",
+                        "name": "user",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Anthropic session ID",
+                        "name": "session",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Send event request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.SendAnthropicEventRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.SendAnthropicEventResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
         "/api/v2/appearance": {
             "get": {
                 "produces": [
@@ -16284,6 +16344,21 @@ const docTemplate = `{
                 }
             }
         },
+        "codersdk.AnthropicEvent": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "processed_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "codersdk.AnthropicSession": {
             "type": "object",
             "properties": {
@@ -23370,6 +23445,29 @@ const docTemplate = `{
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
+                    }
+                }
+            }
+        },
+        "codersdk.SendAnthropicEventRequest": {
+            "type": "object",
+            "required": [
+                "text"
+            ],
+            "properties": {
+                "text": {
+                    "description": "Text is the body of the user message. Required, non-empty.",
+                    "type": "string"
+                }
+            }
+        },
+        "codersdk.SendAnthropicEventResponse": {
+            "type": "object",
+            "properties": {
+                "events": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.AnthropicEvent"
                     }
                 }
             }

@@ -1445,6 +1445,24 @@ None
 |----------|-------------------------------------------------------------|----------|--------------|-------------|
 | `agents` | array of [codersdk.AnthropicAgent](#codersdkanthropicagent) | false    |              |             |
 
+## codersdk.AnthropicEvent
+
+```json
+{
+  "id": "string",
+  "processed_at": "2019-08-24T14:15:22Z",
+  "type": "string"
+}
+```
+
+### Properties
+
+| Name           | Type   | Required | Restrictions | Description |
+|----------------|--------|----------|--------------|-------------|
+| `id`           | string | false    |              |             |
+| `processed_at` | string | false    |              |             |
+| `type`         | string | false    |              |             |
+
 ## codersdk.AnthropicSession
 
 ```json
@@ -11223,6 +11241,40 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
 | `hostname_suffix`    | string | false    |              | Hostname suffix is the suffix to append to workspace names for SSH hostnames.                                         |
 | `ssh_config_options` | object | false    |              |                                                                                                                       |
 | » `[any property]`   | string | false    |              |                                                                                                                       |
+
+## codersdk.SendAnthropicEventRequest
+
+```json
+{
+  "text": "string"
+}
+```
+
+### Properties
+
+| Name   | Type   | Required | Restrictions | Description                                                |
+|--------|--------|----------|--------------|------------------------------------------------------------|
+| `text` | string | true     |              | Text is the body of the user message. Required, non-empty. |
+
+## codersdk.SendAnthropicEventResponse
+
+```json
+{
+  "events": [
+    {
+      "id": "string",
+      "processed_at": "2019-08-24T14:15:22Z",
+      "type": "string"
+    }
+  ]
+}
+```
+
+### Properties
+
+| Name     | Type                                                        | Required | Restrictions | Description |
+|----------|-------------------------------------------------------------|----------|--------------|-------------|
+| `events` | array of [codersdk.AnthropicEvent](#codersdkanthropicevent) | false    |              |             |
 
 ## codersdk.ServerSentEvent
 

@@ -1521,6 +1521,7 @@ func New(options *Options) *API {
 				r.Route("/sessions/{user}", func(r chi.Router) {
 					r.Use(httpmw.ExtractUserParam(options.Database))
 					r.Post("/", api.AnthropicSessions.CreateSession)
+					r.Post("/{session}/events", api.AnthropicSessions.SendEvent)
 				})
 			})
 		}

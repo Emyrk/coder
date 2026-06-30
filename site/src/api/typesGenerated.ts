@@ -1194,6 +1194,18 @@ export interface AnthropicAgentsResponse {
 	readonly agents: readonly AnthropicAgent[];
 }
 
+// From codersdk/anthropic.go
+/**
+ * AnthropicEvent is the Coder-facing projection of a session event
+ * acknowledged by Anthropic. Only the fields the UI needs to confirm
+ * receipt are surfaced; the full event payload stays inside Anthropic.
+ */
+export interface AnthropicEvent {
+	readonly id: string;
+	readonly type: string;
+	readonly processed_at: string;
+}
+
 // From codersdk/chats.go
 /**
  * AnthropicInlineImageCapBytes is Anthropic's documented per-image
@@ -7641,6 +7653,30 @@ export interface STUNReport {
 	readonly Enabled: boolean;
 	readonly CanSTUN: boolean;
 	readonly Error: string | null;
+}
+
+// From codersdk/anthropic.go
+/**
+ * SendAnthropicEventRequest is the body for the POST send-event
+ * endpoint. The first slice supports text-only user messages; richer
+ * content types (images, tool confirmations, interrupts) land in a
+ * follow-up without a wire-shape break by adding optional fields.
+ */
+export interface SendAnthropicEventRequest {
+	/**
+	 * Text is the body of the user message. Required, non-empty.
+	 */
+	readonly text: string;
+}
+
+// From codersdk/anthropic.go
+/**
+ * SendAnthropicEventResponse is the response shape for the send-event
+ * endpoint. Anthropic returns an array of events because a single
+ * request may carry multiple events; today coderd only sends one.
+ */
+export interface SendAnthropicEventResponse {
+	readonly events: readonly AnthropicEvent[];
 }
 
 // From serpent/serpent.go
