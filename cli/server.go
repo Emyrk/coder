@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	anthropicoption "github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/coreos/go-systemd/daemon"
@@ -1099,6 +1100,7 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 			// from the same config further below.
 			var anthropicConfigured bool
 			var anthropicConfig anthropicpoller.OrgConfig
+			var anthropicClientOpts []anthropicoption.RequestOption
 			if envID := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_ID"); envID != "" {
 				envKey := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_KEY")
 				orgIDStr := os.Getenv("CODER_ANTHROPIC_ORG_ID")
@@ -1114,8 +1116,20 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 					EnvironmentID:  envID,
 					EnvironmentKey: envKey,
 				}
+				// Pin the Anthropic SDK base URL so it does not inherit
+				// ANTHROPIC_BASE_URL from the process env (a workspace agent
+				// running through Coder's AI Bridge would otherwise route
+				// the poller and sessions client through the gateway). Allow
+				// override via CODER_ANTHROPIC_BASE_URL for staging / mocks.
+				baseURL := os.Getenv("CODER_ANTHROPIC_BASE_URL")
+				if baseURL == "" {
+					baseURL = "https://api.anthropic.com/"
+				}
+				anthropicClientOpts = []anthropicoption.RequestOption{
+					anthropicoption.WithBaseURL(baseURL),
+				}
 				anthropicConfigured = true
-				sessionsSvc, err := anthropicsessions.New(anthropicConfig, options.Database, logger.Named("anthropic.sessions"))
+				sessionsSvc, err := anthropicsessions.New(anthropicConfig, options.Database, logger.Named("anthropic.sessions"), anthropicClientOpts...)
 				if err != nil {
 					return xerrors.Errorf("create anthropic sessions service: %w", err)
 				}
@@ -1195,7 +1209,7 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 				pollerLogger := logger.Named("anthropic.poller")
 				poller, err := anthropicpoller.New(
 					anthropicConfig,
-					anthropic.NewClient(),
+					anthropic.NewClient(anthropicClientOpts...),
 					&anthropicpoller.LogDispatcher{Logger: pollerLogger.Named("dispatcher")},
 					pollerLogger,
 				)
