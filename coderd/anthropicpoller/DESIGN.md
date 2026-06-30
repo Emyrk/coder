@@ -376,6 +376,22 @@ Follow-up options (not in this PoC):
 
 If either follow-up is later picked up, the SDK client constructor lives in one place (`cli/server.go`, `anthropicClientOpts`). `CODER_ANTHROPIC_BASE_URL` already exists as the override knob to point at a bridge instead of `api.anthropic.com`.
 
+## 10. Worker credential scope: env-wide key vs per-work JWT
+
+Decision (PoC): the workspace dispatcher injects the org-wide environment key (`sk-ant-oat01-...`) as `ANTHROPIC_ENVIRONMENT_KEY` on the workspace agent, matching the existing `coder-anthropic-integration-poc` module's contract.
+
+This is wider-scoped than necessary. The env key authenticates any work-queue call against the entire Anthropic environment for the Coder org. A worker process inside a sandbox workspace, given that key, could in principle claim *other* sessions' work, surrender other workers' items, or poll for jobs that do not belong to its session. Today we mitigate this by trusting the inner runner (`ant beta:agent run`) to use only the `ANTHROPIC_WORK_ID` / `ANTHROPIC_SESSION_ID` it was given, but that trust is policy, not enforcement.
+
+The Anthropic SDK exposes a tighter alternative: every work item the poller claims carries a `Secret` field documented as a "Session instance JWT secret (only included in certain retrieval paths)". That JWT is scoped to one work item, expires with it, and cannot be used to claim other work or to call non-session APIs.
+
+Follow-up (out of scope for PoC):
+
+- Replace `ANTHROPIC_ENVIRONMENT_KEY` injection with `ANTHROPIC_WORK_SECRET` (the JWT) on the agent.
+- Confirm the v1.x `ant beta:agent run` (or whichever inner runner is current) accepts a per-work-item secret in lieu of the env key, and switch the module's `run.sh` to use it.
+- Drop the env key from the agent's environment entirely. Even if the worker process needs the env key for an unrelated reason, it should be sourced from the Coder server (e.g., via a workspace-scoped Coder API call) rather than baked into the agent's env at provision time.
+
+The PoC accepts the broader scope for now to unblock the end-to-end flow. The trade was made knowingly; the tighten-to-JWT is a tracked follow-up, not a missed requirement.
+
 ## Appendix: raw source notes
 
 ### Anthropic docs
