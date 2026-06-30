@@ -1150,6 +1150,34 @@ export const AgentSubsystems: AgentSubsystem[] = [
 	"exectrace",
 ];
 
+// From codersdk/anthropic.go
+/**
+ * AnthropicAgent is the Coder-facing projection of an Anthropic
+ * managed agent. Only the fields the Coder UI needs to render a
+ * picker are surfaced; everything else (system prompt, tools,
+ * skills, MCP servers, etc.) stays inside Anthropic.
+ */
+export interface AnthropicAgent {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
+	readonly model: string;
+	readonly version: number;
+	readonly archived: boolean;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
+// From codersdk/anthropic.go
+/**
+ * AnthropicAgentsResponse is the response shape for the list-agents
+ * endpoint. A response object (instead of a bare array) gives us room
+ * to add pagination cursors later without breaking the wire format.
+ */
+export interface AnthropicAgentsResponse {
+	readonly agents: readonly AnthropicAgent[];
+}
+
 // From codersdk/chats.go
 /**
  * AnthropicInlineImageCapBytes is Anthropic's documented per-image
@@ -1157,6 +1185,28 @@ export const AgentSubsystems: AgentSubsystem[] = [
  * providers have no documented per-image cap.
  */
 export const AnthropicInlineImageCapBytes = 5242880;
+
+// From codersdk/anthropic.go
+/**
+ * AnthropicSession is the Coder-facing projection of a newly created
+ * Anthropic session. Anthropic does not return a session-level secret
+ * on creation; the per-work-item JWT is delivered to the environment
+ * manager when work is claimed, which is the poller's concern.
+ */
+export interface AnthropicSession {
+	readonly id: string;
+	readonly agent_id: string;
+	readonly environment_id: string;
+	readonly title: string;
+	readonly metadata: Record<string, string>;
+	readonly created_at: string;
+	/**
+	 * CoderUserID echoes the Coder user the session was created for,
+	 * matching the value coderd stamped into Metadata. Surfaced as a
+	 * dedicated field so the UI does not have to dig into Metadata.
+	 */
+	readonly coder_user_id: string;
+}
 
 // From codersdk/deployment.go
 export interface AppHostResponse {
@@ -3465,6 +3515,32 @@ export interface CreateAIProviderRequest {
 	readonly base_url: string;
 	readonly api_keys?: readonly string[];
 	readonly settings?: AIProviderSettings;
+}
+
+// From codersdk/anthropic.go
+/**
+ * CreateAnthropicSessionRequest is the body for the POST create
+ * endpoint. Coderd injects EnvironmentID from server-side config and
+ * always overwrites the reserved metadata keys; the client controls
+ * AgentID, Title, and the non-reserved metadata.
+ */
+export interface CreateAnthropicSessionRequest {
+	/**
+	 * AgentID is the Anthropic agent the session should bind to.
+	 * Required. The UI selects this from [AnthropicAgentsResponse].
+	 */
+	readonly agent_id: string;
+	/**
+	 * Title is an optional human-readable session label that Anthropic
+	 * shows in its console. Coderd does not interpret it.
+	 */
+	readonly title?: string;
+	/**
+	 * Metadata is free-form session metadata. Coderd overwrites the
+	 * keys listed in [AnthropicReservedMetadataKeys]; everything else
+	 * is forwarded to Anthropic verbatim.
+	 */
+	readonly metadata?: Record<string, string>;
 }
 
 // From codersdk/chats.go

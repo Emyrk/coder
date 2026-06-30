@@ -48,6 +48,7 @@ import (
 	"github.com/coder/coder/v2/coderd/aibridge"
 	"github.com/coder/coder/v2/coderd/aibridge/prices"
 	"github.com/coder/coder/v2/coderd/aiseats"
+	anthropicsessions "github.com/coder/coder/v2/coderd/anthropicpoller/sessions"
 	_ "github.com/coder/coder/v2/coderd/apidoc" // Used for swagger docs.
 	"github.com/coder/coder/v2/coderd/appearance"
 	"github.com/coder/coder/v2/coderd/audit"
@@ -177,19 +178,26 @@ type Options struct {
 	AgentInactiveDisconnectTimeout time.Duration
 	ChatdInstructionLookupTimeout  time.Duration
 	AWSCertificates                awsidentity.Certificates
-	Authorizer                     rbac.Authorizer
-	AzureCertificates              azureidentity.Options
-	GoogleTokenValidator           *idtoken.Validator
-	GithubOAuth2Config             *GithubOAuth2Config
-	OIDCConfig                     *OIDCConfig
-	PrometheusRegistry             *prometheus.Registry
-	StrictTransportSecurityCfg     httpmw.HSTSConfig
-	SSHKeygenAlgorithm             gitsshkey.Algorithm
-	Telemetry                      telemetry.Reporter
-	TracerProvider                 trace.TracerProvider
-	ExternalAuthConfigs            []*externalauth.Config
-	RealIPConfig                   *httpmw.RealIPConfig
-	TrialGenerator                 func(ctx context.Context, body codersdk.LicensorTrialRequest) error
+
+	// AnthropicSessions, when non-nil, registers the upstream
+	// Anthropic agents-list and session-create routes under
+	// /api/v2/anthropic/{organization}/.... Bootstrapped by the
+	// same env-var path that starts the work poller; see
+	// cli/server.go and coderd/anthropicpoller/DESIGN.md.
+	AnthropicSessions          *anthropicsessions.Service
+	Authorizer                 rbac.Authorizer
+	AzureCertificates          azureidentity.Options
+	GoogleTokenValidator       *idtoken.Validator
+	GithubOAuth2Config         *GithubOAuth2Config
+	OIDCConfig                 *OIDCConfig
+	PrometheusRegistry         *prometheus.Registry
+	StrictTransportSecurityCfg httpmw.HSTSConfig
+	SSHKeygenAlgorithm         gitsshkey.Algorithm
+	Telemetry                  telemetry.Reporter
+	TracerProvider             trace.TracerProvider
+	ExternalAuthConfigs        []*externalauth.Config
+	RealIPConfig               *httpmw.RealIPConfig
+	TrialGenerator             func(ctx context.Context, body codersdk.LicensorTrialRequest) error
 	// RefreshEntitlements is used to set correct entitlements after creating first user and generating trial license.
 	RefreshEntitlements func(ctx context.Context) error
 	// Entitlements can come from the enterprise caller if enterprise code is
@@ -1500,6 +1508,22 @@ func New(options *Options) *API {
 				r.Get("/device", api.externalAuthDeviceByID)
 			})
 		})
+		if api.AnthropicSessions != nil {
+			r.Route("/anthropic/{organization}", func(r chi.Router) {
+				r.Use(
+					apiKeyMiddleware,
+					httpmw.ExtractOrganizationParam(options.Database),
+				)
+				r.Route("/agents/{user}", func(r chi.Router) {
+					r.Use(httpmw.ExtractUserParam(options.Database))
+					r.Get("/", api.AnthropicSessions.ListAgents)
+				})
+				r.Route("/sessions/{user}", func(r chi.Router) {
+					r.Use(httpmw.ExtractUserParam(options.Database))
+					r.Post("/", api.AnthropicSessions.CreateSession)
+				})
+			})
+		}
 		r.Route("/organizations", func(r chi.Router) {
 			r.Use(
 				apiKeyMiddleware,

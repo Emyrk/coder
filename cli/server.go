@@ -66,6 +66,7 @@ import (
 	"github.com/coder/coder/v2/coderd"
 	"github.com/coder/coder/v2/coderd/aibridged"
 	"github.com/coder/coder/v2/coderd/anthropicpoller"
+	anthropicsessions "github.com/coder/coder/v2/coderd/anthropicpoller/sessions"
 	"github.com/coder/coder/v2/coderd/authlink"
 	"github.com/coder/coder/v2/coderd/autobuild"
 	"github.com/coder/coder/v2/coderd/database"
@@ -1092,6 +1093,35 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 			notificationReportGenerator := reports.NewReportGenerator(ctx, logger.Named("notifications.report_generator"), options.Database, options.NotificationsEnqueuer, quartz.NewReal())
 			defer notificationReportGenerator.Close()
 
+			// Anthropic self-hosted sandbox integration (PoC). Read the env
+			// config early so the upstream session service can be installed
+			// on options before newAPI mounts routes. The work poller boots
+			// from the same config further below.
+			var anthropicConfigured bool
+			var anthropicConfig anthropicpoller.OrgConfig
+			if envID := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_ID"); envID != "" {
+				envKey := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_KEY")
+				orgIDStr := os.Getenv("CODER_ANTHROPIC_ORG_ID")
+				if envKey == "" || orgIDStr == "" {
+					return xerrors.New("CODER_ANTHROPIC_ENVIRONMENT_ID is set; CODER_ANTHROPIC_ENVIRONMENT_KEY and CODER_ANTHROPIC_ORG_ID are also required")
+				}
+				orgID, err := uuid.Parse(orgIDStr)
+				if err != nil {
+					return xerrors.Errorf("parse CODER_ANTHROPIC_ORG_ID: %w", err)
+				}
+				anthropicConfig = anthropicpoller.OrgConfig{
+					OrgID:          orgID,
+					EnvironmentID:  envID,
+					EnvironmentKey: envKey,
+				}
+				anthropicConfigured = true
+				sessionsSvc, err := anthropicsessions.New(anthropicConfig, options.Database, logger.Named("anthropic.sessions"))
+				if err != nil {
+					return xerrors.Errorf("create anthropic sessions service: %w", err)
+				}
+				options.AnthropicSessions = sessionsSvc
+			}
+
 			// We use a separate coderAPICloser so the Enterprise API
 			// can have its own close functions. This is cleaner
 			// than abstracting the Coder API itself.
@@ -1155,34 +1185,16 @@ func (r *RootCmd) Server(newAPI func(context.Context, *coderd.Options) (*coderd.
 
 			// Anthropic self-hosted sandbox poller (PoC).
 			//
-			// Opt-in via three environment variables:
-			//   CODER_ANTHROPIC_ORG_ID         Coder organization UUID this poller serves.
-			//   CODER_ANTHROPIC_ENVIRONMENT_ID Anthropic environment whose work queue we poll.
-			//   CODER_ANTHROPIC_ENVIRONMENT_KEY Bearer token for the Anthropic environment.
-			//
-			// When all three are set, coderd starts one long-poll goroutine
-			// against the Anthropic environment. Claimed work items are routed
-			// to a LogDispatcher that logs metadata but does not yet spawn
-			// workspaces. This is the polling-half demo from the integration
-			// design; the workspace dispatch is a separate slice. See
-			// coderd/anthropicpoller/DESIGN.md.
-			if envID := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_ID"); envID != "" {
-				envKey := os.Getenv("CODER_ANTHROPIC_ENVIRONMENT_KEY")
-				orgIDStr := os.Getenv("CODER_ANTHROPIC_ORG_ID")
-				if envKey == "" || orgIDStr == "" {
-					return xerrors.New("CODER_ANTHROPIC_ENVIRONMENT_ID is set; CODER_ANTHROPIC_ENVIRONMENT_KEY and CODER_ANTHROPIC_ORG_ID are also required")
-				}
-				orgID, err := uuid.Parse(orgIDStr)
-				if err != nil {
-					return xerrors.Errorf("parse CODER_ANTHROPIC_ORG_ID: %w", err)
-				}
+			// The opt-in config was loaded earlier (just before newAPI) so the
+			// session-creation routes could be mounted. Here we start the
+			// long-poll goroutine against the work queue. Claimed items are
+			// routed to a LogDispatcher that logs metadata but does not yet
+			// spawn workspaces; the workspace dispatch is a separate slice.
+			// See coderd/anthropicpoller/DESIGN.md.
+			if anthropicConfigured {
 				pollerLogger := logger.Named("anthropic.poller")
 				poller, err := anthropicpoller.New(
-					anthropicpoller.OrgConfig{
-						OrgID:          orgID,
-						EnvironmentID:  envID,
-						EnvironmentKey: envKey,
-					},
+					anthropicConfig,
 					anthropic.NewClient(),
 					&anthropicpoller.LogDispatcher{Logger: pollerLogger.Named("dispatcher")},
 					pollerLogger,

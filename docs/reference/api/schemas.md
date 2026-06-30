@@ -1392,6 +1392,89 @@ None
 |-------------------------------------|
 | `envbox`, `envbuilder`, `exectrace` |
 
+## codersdk.AnthropicAgent
+
+```json
+{
+  "archived": true,
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "id": "string",
+  "model": "string",
+  "name": "string",
+  "updated_at": "2019-08-24T14:15:22Z",
+  "version": 0
+}
+```
+
+### Properties
+
+| Name          | Type    | Required | Restrictions | Description |
+|---------------|---------|----------|--------------|-------------|
+| `archived`    | boolean | false    |              |             |
+| `created_at`  | string  | false    |              |             |
+| `description` | string  | false    |              |             |
+| `id`          | string  | false    |              |             |
+| `model`       | string  | false    |              |             |
+| `name`        | string  | false    |              |             |
+| `updated_at`  | string  | false    |              |             |
+| `version`     | integer | false    |              |             |
+
+## codersdk.AnthropicAgentsResponse
+
+```json
+{
+  "agents": [
+    {
+      "archived": true,
+      "created_at": "2019-08-24T14:15:22Z",
+      "description": "string",
+      "id": "string",
+      "model": "string",
+      "name": "string",
+      "updated_at": "2019-08-24T14:15:22Z",
+      "version": 0
+    }
+  ]
+}
+```
+
+### Properties
+
+| Name     | Type                                                        | Required | Restrictions | Description |
+|----------|-------------------------------------------------------------|----------|--------------|-------------|
+| `agents` | array of [codersdk.AnthropicAgent](#codersdkanthropicagent) | false    |              |             |
+
+## codersdk.AnthropicSession
+
+```json
+{
+  "agent_id": "string",
+  "coder_user_id": "fd606ca1-5b9c-46b3-9534-63f05144fb86",
+  "created_at": "2019-08-24T14:15:22Z",
+  "environment_id": "string",
+  "id": "string",
+  "metadata": {
+    "property1": "string",
+    "property2": "string"
+  },
+  "title": "string"
+}
+```
+
+### Properties
+
+| Name               | Type   | Required | Restrictions | Description                                                                                                                                                                                   |
+|--------------------|--------|----------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `agent_id`         | string | false    |              |                                                                                                                                                                                               |
+| `coder_user_id`    | string | false    |              | Coder user ID echoes the Coder user the session was created for, matching the value coderd stamped into Metadata. Surfaced as a dedicated field so the UI does not have to dig into Metadata. |
+| `created_at`       | string | false    |              |                                                                                                                                                                                               |
+| `environment_id`   | string | false    |              |                                                                                                                                                                                               |
+| `id`               | string | false    |              |                                                                                                                                                                                               |
+| `metadata`         | object | false    |              |                                                                                                                                                                                               |
+| » `[any property]` | string | false    |              |                                                                                                                                                                                               |
+| `title`            | string | false    |              |                                                                                                                                                                                               |
+
 ## codersdk.AppHostResponse
 
 ```json
@@ -4321,6 +4404,28 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `name`         | string                                                     | false    |              |             |
 | `settings`     | [codersdk.AIProviderSettings](#codersdkaiprovidersettings) | false    |              |             |
 | `type`         | [codersdk.AIProviderType](#codersdkaiprovidertype)         | false    |              |             |
+
+## codersdk.CreateAnthropicSessionRequest
+
+```json
+{
+  "agent_id": "string",
+  "metadata": {
+    "property1": "string",
+    "property2": "string"
+  },
+  "title": "string"
+}
+```
+
+### Properties
+
+| Name               | Type   | Required | Restrictions | Description                                                                                                                                                       |
+|--------------------|--------|----------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `agent_id`         | string | true     |              | Agent ID is the Anthropic agent the session should bind to. Required. The UI selects this from [AnthropicAgentsResponse].                                         |
+| `metadata`         | object | false    |              | Metadata is free-form session metadata. Coderd overwrites the keys listed in [AnthropicReservedMetadataKeys]; everything else is forwarded to Anthropic verbatim. |
+| » `[any property]` | string | false    |              |                                                                                                                                                                   |
+| `title`            | string | false    |              | Title is an optional human-readable session label that Anthropic shows in its console. Coderd does not interpret it.                                              |
 
 ## codersdk.CreateChatMessageRequest
 

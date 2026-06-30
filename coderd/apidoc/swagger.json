@@ -49,6 +49,90 @@
 				}
 			}
 		},
+		"/anthropic/{organization}/agents/{user}": {
+			"get": {
+				"produces": ["application/json"],
+				"tags": ["Anthropic"],
+				"summary": "List Anthropic agents the user can see",
+				"operationId": "list-anthropic-agents",
+				"parameters": [
+					{
+						"type": "string",
+						"description": "Organization ID",
+						"name": "organization",
+						"in": "path",
+						"required": true
+					},
+					{
+						"type": "string",
+						"description": "User ID, username, or me",
+						"name": "user",
+						"in": "path",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"$ref": "#/definitions/codersdk.AnthropicAgentsResponse"
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			}
+		},
+		"/anthropic/{organization}/sessions/{user}": {
+			"post": {
+				"consumes": ["application/json"],
+				"produces": ["application/json"],
+				"tags": ["Anthropic"],
+				"summary": "Create an Anthropic session for the user",
+				"operationId": "create-anthropic-session",
+				"parameters": [
+					{
+						"type": "string",
+						"description": "Organization ID",
+						"name": "organization",
+						"in": "path",
+						"required": true
+					},
+					{
+						"type": "string",
+						"description": "User ID, username, or me",
+						"name": "user",
+						"in": "path",
+						"required": true
+					},
+					{
+						"description": "Create session request",
+						"name": "request",
+						"in": "body",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/codersdk.CreateAnthropicSessionRequest"
+						}
+					}
+				],
+				"responses": {
+					"201": {
+						"description": "Created",
+						"schema": {
+							"$ref": "#/definitions/codersdk.AnthropicSession"
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			}
+		},
 		"/api/experimental/chats": {
 			"get": {
 				"description": "Experimental: this endpoint is subject to change.",
@@ -14473,6 +14557,80 @@
 				"AgentSubsystemExectrace"
 			]
 		},
+		"codersdk.AnthropicAgent": {
+			"type": "object",
+			"properties": {
+				"archived": {
+					"type": "boolean"
+				},
+				"created_at": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"description": {
+					"type": "string"
+				},
+				"id": {
+					"type": "string"
+				},
+				"model": {
+					"type": "string"
+				},
+				"name": {
+					"type": "string"
+				},
+				"updated_at": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"version": {
+					"type": "integer"
+				}
+			}
+		},
+		"codersdk.AnthropicAgentsResponse": {
+			"type": "object",
+			"properties": {
+				"agents": {
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/codersdk.AnthropicAgent"
+					}
+				}
+			}
+		},
+		"codersdk.AnthropicSession": {
+			"type": "object",
+			"properties": {
+				"agent_id": {
+					"type": "string"
+				},
+				"coder_user_id": {
+					"description": "CoderUserID echoes the Coder user the session was created for,\nmatching the value coderd stamped into Metadata. Surfaced as a\ndedicated field so the UI does not have to dig into Metadata.",
+					"type": "string",
+					"format": "uuid"
+				},
+				"created_at": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"environment_id": {
+					"type": "string"
+				},
+				"id": {
+					"type": "string"
+				},
+				"metadata": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					}
+				},
+				"title": {
+					"type": "string"
+				}
+			}
+		},
 		"codersdk.AppHostResponse": {
 			"type": "object",
 			"properties": {
@@ -16341,6 +16499,27 @@
 				},
 				"type": {
 					"$ref": "#/definitions/codersdk.AIProviderType"
+				}
+			}
+		},
+		"codersdk.CreateAnthropicSessionRequest": {
+			"type": "object",
+			"required": ["agent_id"],
+			"properties": {
+				"agent_id": {
+					"description": "AgentID is the Anthropic agent the session should bind to.\nRequired. The UI selects this from [AnthropicAgentsResponse].",
+					"type": "string"
+				},
+				"metadata": {
+					"description": "Metadata is free-form session metadata. Coderd overwrites the\nkeys listed in [AnthropicReservedMetadataKeys]; everything else\nis forwarded to Anthropic verbatim.",
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					}
+				},
+				"title": {
+					"description": "Title is an optional human-readable session label that Anthropic\nshows in its console. Coderd does not interpret it.",
+					"type": "string"
 				}
 			}
 		},

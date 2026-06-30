@@ -1534,6 +1534,10 @@
 							"path": "./reference/api/agents.md"
 						},
 						{
+							"title": "Anthropic",
+							"path": "./reference/api/anthropic.md"
+						},
+						{
 							"title": "Applications",
 							"path": "./reference/api/applications.md"
 						},
