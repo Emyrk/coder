@@ -63,6 +63,16 @@ export const Sidebar: FC<SidebarProps> = ({ user }) => {
 						/>
 					</span>
 				</SettingsSidebarNavItem>
+				<SettingsSidebarNavItem href="anthropic">
+					<span className="flex min-w-0 items-center gap-2">
+						<span>Anthropic</span>
+						<FeatureStageBadge
+							aria-hidden="true"
+							contentType="beta"
+							size="sm"
+						/>
+					</span>
+				</SettingsSidebarNavItem>
 				<SettingsSidebarNavItem href="notifications">
 					Notifications
 				</SettingsSidebarNavItem>

@@ -1874,6 +1874,28 @@ class ApiMethods {
 		);
 	};
 
+	getAnthropicAgents = async (
+		organization: string,
+		userId: string,
+	): Promise<TypesGen.AnthropicAgentsResponse> => {
+		const response = await this.axios.get<TypesGen.AnthropicAgentsResponse>(
+			`/api/v2/anthropic/${encodeURIComponent(organization)}/agents/${encodeURIComponent(userId)}`,
+		);
+		return response.data;
+	};
+
+	createAnthropicSession = async (
+		organization: string,
+		userId: string,
+		request: TypesGen.CreateAnthropicSessionRequest,
+	): Promise<TypesGen.AnthropicSession> => {
+		const response = await this.axios.post<TypesGen.AnthropicSession>(
+			`/api/v2/anthropic/${encodeURIComponent(organization)}/sessions/${encodeURIComponent(userId)}`,
+			request,
+		);
+		return response.data;
+	};
+
 	getWorkspaceBuilds = async (
 		workspaceId: string,
 		req?: TypesGen.WorkspaceBuildsRequest,

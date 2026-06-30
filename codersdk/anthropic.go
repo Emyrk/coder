@@ -6,6 +6,19 @@ import (
 	"github.com/google/uuid"
 )
 
+// AnthropicAPIKeySecretName is the well-known user-secret name that
+// holds a Coder user's Anthropic platform API key. The Anthropic
+// session-create and agent-list endpoints look the secret up by this
+// exact name; the Settings -> Anthropic page writes it under the same
+// name so the two paths stay in sync.
+//
+// The name matches the SDK's ANTHROPIC_API_KEY env var so the same
+// secret can also be injected into workspaces by the secret machinery
+// later without renaming.
+//
+//nolint:gosec // Constant holds the *name* of a secret, not its value.
+const AnthropicAPIKeySecretName = "ANTHROPIC_API_KEY"
+
 // AnthropicAgent is the Coder-facing projection of an Anthropic
 // managed agent. Only the fields the Coder UI needs to render a
 // picker are surfaced; everything else (system prompt, tools,

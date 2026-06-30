@@ -98,6 +98,6 @@ func (s *Service) ListAgents(rw http.ResponseWriter, r *http.Request) {
 func writeMissingAPIKey(ctx context.Context, rw http.ResponseWriter) {
 	httpapi.Write(ctx, rw, http.StatusPreconditionFailed, codersdk.Response{
 		Message: "Anthropic API key is not configured for this user.",
-		Detail:  "Add a user secret named " + AnthropicAPIKeySecretName + " in Settings -> Secrets.",
+		Detail:  "Add a user secret named " + codersdk.AnthropicAPIKeySecretName + " in Settings -> Anthropic.",
 	})
 }

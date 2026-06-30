@@ -70,6 +70,9 @@ const TokensPage = lazy(
 const SecretsPage = lazy(
 	() => import("./pages/UserSettingsPage/SecretsPage/SecretsPage"),
 );
+const AnthropicPage = lazy(
+	() => import("./pages/UserSettingsPage/AnthropicPage/AnthropicPage"),
+);
 const WorkspaceProxyPage = lazy(
 	() =>
 		import("./pages/UserSettingsPage/WorkspaceProxyPage/WorkspaceProxyPage"),
@@ -711,6 +714,7 @@ export const router = createBrowserRouter(
 							<Route path="new" element={<CreateTokenPage />} />
 						</Route>
 						<Route path="secrets" element={<SecretsPage />} />
+						<Route path="anthropic" element={<AnthropicPage />} />
 						<Route path="notifications" element={<UserNotificationsPage />} />
 					</Route>
 

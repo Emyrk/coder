@@ -6,12 +6,12 @@
 
 ```shell
 # Example request using curl
-curl -X GET http://coder-server:8080/anthropic/{organization}/agents/{user} \
+curl -X GET http://coder-server:8080/api/v2/anthropic/{organization}/agents/{user} \
   -H 'Accept: application/json' \
   -H 'Coder-Session-Token: API_KEY'
 ```
 
-`GET /anthropic/{organization}/agents/{user}`
+`GET /api/v2/anthropic/{organization}/agents/{user}`
 
 ### Parameters
 
@@ -55,13 +55,13 @@ To perform this operation, you must be authenticated. [Learn more](authenticatio
 
 ```shell
 # Example request using curl
-curl -X POST http://coder-server:8080/anthropic/{organization}/sessions/{user} \
+curl -X POST http://coder-server:8080/api/v2/anthropic/{organization}/sessions/{user} \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json' \
   -H 'Coder-Session-Token: API_KEY'
 ```
 
-`POST /anthropic/{organization}/sessions/{user}`
+`POST /api/v2/anthropic/{organization}/sessions/{user}`
 
 > Body parameter
 
