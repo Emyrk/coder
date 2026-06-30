@@ -1,6 +1,16 @@
-import { BotIcon, KeyRoundIcon, RefreshCwIcon, TrashIcon } from "lucide-react";
+import {
+	BotIcon,
+	KeyRoundIcon,
+	RefreshCwIcon,
+	SendIcon,
+	TrashIcon,
+} from "lucide-react";
 import { type FC, type FormEvent, useId, useState } from "react";
-import type { AnthropicAgent } from "#/api/typesGenerated";
+import type {
+	AnthropicAgent,
+	AnthropicSession,
+	SendAnthropicEventResponse,
+} from "#/api/typesGenerated";
 import { ErrorAlert } from "#/components/Alert/ErrorAlert";
 import { Badge } from "#/components/Badge/Badge";
 import { Button } from "#/components/Button/Button";
@@ -45,9 +55,23 @@ type AnthropicPageViewProps = {
 	/** Error from the most recent agents fetch, if any. */
 	agentsError?: unknown;
 
+	/** Session-create mutation in-flight indicator. */
+	isCreatingSession: boolean;
+	/** Most recent create-session error to surface in the tester. */
+	createSessionError?: unknown;
+	/** Send-event mutation in-flight indicator. */
+	isSendingEvent: boolean;
+	/** Most recent send-event error to surface in the tester. */
+	sendEventError?: unknown;
+
 	onSaveKey: (value: string) => Promise<void> | void;
 	onRemoveKey: () => Promise<void> | void;
 	onRefreshAgents: () => void;
+	onCreateSession: (agentId: string) => Promise<AnthropicSession>;
+	onSendEvent: (
+		sessionId: string,
+		text: string,
+	) => Promise<SendAnthropicEventResponse>;
 };
 
 /**
@@ -66,9 +90,15 @@ export const AnthropicPageView: FC<AnthropicPageViewProps> = ({
 	isLoadingAgents,
 	isRefreshingAgents,
 	agentsError,
+	isCreatingSession,
+	createSessionError,
+	isSendingEvent,
+	sendEventError,
 	onSaveKey,
 	onRemoveKey,
 	onRefreshAgents,
+	onCreateSession,
+	onSendEvent,
 }) => {
 	return (
 		<div className="flex flex-col gap-8">
@@ -104,6 +134,18 @@ export const AnthropicPageView: FC<AnthropicPageViewProps> = ({
 					isRefreshing={isRefreshingAgents}
 					error={agentsError}
 					onRefresh={onRefreshAgents}
+				/>
+			)}
+
+			{hasApiKey && agents && agents.length > 0 && (
+				<SessionTesterSection
+					agents={agents}
+					isCreatingSession={isCreatingSession}
+					createSessionError={createSessionError}
+					isSendingEvent={isSendingEvent}
+					sendEventError={sendEventError}
+					onCreateSession={onCreateSession}
+					onSendEvent={onSendEvent}
 				/>
 			)}
 		</div>
@@ -348,6 +390,184 @@ const AgentsSection: FC<AgentsSectionProps> = ({
 					</TableBody>
 				</Table>
 			)}
+		</section>
+	);
+};
+
+type SessionTesterSectionProps = {
+	agents: readonly AnthropicAgent[];
+	isCreatingSession: boolean;
+	createSessionError?: unknown;
+	isSendingEvent: boolean;
+	sendEventError?: unknown;
+	onCreateSession: (agentId: string) => Promise<AnthropicSession>;
+	onSendEvent: (
+		sessionId: string,
+		text: string,
+	) => Promise<SendAnthropicEventResponse>;
+};
+
+/**
+ * SessionTesterSection lets an operator drive the Anthropic session
+ * pipeline end-to-end from the Coder UI. The flow mirrors the backend
+ * smoke test: pick an agent, create a session, send a user-message
+ * event. The poller logs the resulting work item server-side; this
+ * panel only confirms the Anthropic-side handshake succeeded.
+ */
+const SessionTesterSection: FC<SessionTesterSectionProps> = ({
+	agents,
+	isCreatingSession,
+	createSessionError,
+	isSendingEvent,
+	sendEventError,
+	onCreateSession,
+	onSendEvent,
+}) => {
+	const agentSelectId = useId();
+	const sessionInputId = useId();
+	const textareaId = useId();
+	const activeAgents = agents.filter((a) => !a.archived);
+	const firstAgentId = activeAgents[0]?.id ?? agents[0]?.id ?? "";
+	const [agentId, setAgentId] = useState(firstAgentId);
+	const [sessionId, setSessionId] = useState("");
+	const [eventText, setEventText] = useState("");
+	const [lastSent, setLastSent] = useState<{
+		eventId: string;
+		at: Date;
+	} | null>(null);
+
+	const trimmedSession = sessionId.trim();
+	const trimmedText = eventText.trim();
+	const canCreate = !!agentId && !isCreatingSession;
+	const canSend =
+		trimmedSession.length > 0 && trimmedText.length > 0 && !isSendingEvent;
+
+	const handleCreate = () => {
+		if (!canCreate) {
+			return;
+		}
+		void (async () => {
+			const created = await onCreateSession(agentId);
+			setSessionId(created.id);
+			setLastSent(null);
+		})();
+	};
+
+	const handleSend = (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		if (!canSend) {
+			return;
+		}
+		void (async () => {
+			const sent = await onSendEvent(trimmedSession, trimmedText);
+			const first = sent.events[0];
+			if (first) {
+				setLastSent({ eventId: first.id, at: new Date() });
+			}
+			setEventText("");
+		})();
+	};
+
+	return (
+		<section className="flex flex-col gap-4 rounded-lg border border-border bg-surface-secondary p-6">
+			<div className="flex items-start gap-3">
+				<SendIcon
+					aria-hidden
+					className="mt-1 size-5 shrink-0 text-content-secondary"
+				/>
+				<div className="flex flex-1 flex-col gap-1">
+					<h2 className="m-0 text-base font-semibold">
+						Test the session pipeline
+					</h2>
+					<p className="m-0 text-sm text-content-secondary">
+						Create a managed-agent session bound to one of your agents, or paste
+						an existing session ID, then send a user message. The Coder server's
+						poller will claim the resulting work item; check the server log to
+						confirm.
+					</p>
+				</div>
+			</div>
+
+			{createSessionError ? <ErrorAlert error={createSessionError} /> : null}
+
+			<div className="flex flex-col gap-2">
+				<Label htmlFor={agentSelectId}>Agent</Label>
+				<select
+					className="h-9 rounded-md border border-border bg-surface-primary px-3 text-sm"
+					id={agentSelectId}
+					onChange={(event) => setAgentId(event.target.value)}
+					value={agentId}
+				>
+					{agents.map((agent) => (
+						<option key={agent.id} value={agent.id}>
+							{(agent.name || "Untitled agent") +
+								(agent.archived ? " (archived)" : "") +
+								" (" +
+								agent.id +
+								")"}
+						</option>
+					))}
+				</select>
+			</div>
+
+			<div className="flex flex-wrap items-center gap-3">
+				<Button disabled={!canCreate} onClick={handleCreate} type="button">
+					<Spinner loading={isCreatingSession} />
+					{trimmedSession === "" ? "Create session" : "Create another session"}
+				</Button>
+			</div>
+
+			<div className="flex flex-col gap-2">
+				<Label htmlFor={sessionInputId}>Session ID</Label>
+				<Input
+					aria-describedby={`${sessionInputId}-help`}
+					autoComplete="off"
+					id={sessionInputId}
+					onChange={(event) => setSessionId(event.target.value)}
+					placeholder="sesn_..."
+					spellCheck={false}
+					value={sessionId}
+				/>
+				<p
+					className="m-0 text-xs text-content-secondary"
+					id={`${sessionInputId}-help`}
+				>
+					Auto-filled when you create a session above. Paste any
+					<code className="px-0.5">sesn_...</code>
+					ID here to send to a different session.
+				</p>
+			</div>
+
+			{sendEventError ? <ErrorAlert error={sendEventError} /> : null}
+
+			<form className="flex flex-col gap-2" onSubmit={handleSend}>
+				<Label htmlFor={textareaId}>User message</Label>
+				<textarea
+					className="min-h-20 rounded-md border border-border bg-surface-primary p-2 text-sm font-mono"
+					disabled={trimmedSession === ""}
+					id={textareaId}
+					onChange={(event) => setEventText(event.target.value)}
+					placeholder={
+						trimmedSession === ""
+							? "Set a session ID above to enable sending."
+							: "Tell the agent what to do."
+					}
+					value={eventText}
+				/>
+				<div className="flex flex-wrap items-center gap-3">
+					<Button disabled={!canSend} type="submit">
+						<Spinner loading={isSendingEvent} />
+						Send user message
+					</Button>
+					{lastSent ? (
+						<span className="text-xs text-content-secondary">
+							Last event:
+							<span className="font-mono">{lastSent.eventId}</span> at{" "}
+							{lastSent.at.toLocaleTimeString()}
+						</span>
+					) : null}
+				</div>
+			</form>
 		</section>
 	);
 };

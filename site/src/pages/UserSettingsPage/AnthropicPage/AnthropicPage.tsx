@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { toast } from "sonner";
+import { API } from "#/api/api";
 import { getErrorMessage } from "#/api/errors";
 import { agentsForUser } from "#/api/queries/anthropic";
 import {
@@ -9,7 +10,11 @@ import {
 	updateUserSecret,
 	userSecrets,
 } from "#/api/queries/userSecrets";
-import { AnthropicAPIKeySecretName } from "#/api/typesGenerated";
+import {
+	AnthropicAPIKeySecretName,
+	type AnthropicSession,
+	type SendAnthropicEventResponse,
+} from "#/api/typesGenerated";
 import { useAuthenticated } from "#/hooks/useAuthenticated";
 import { useDashboard } from "#/modules/dashboard/useDashboard";
 import { AnthropicPageView } from "./AnthropicPageView";
@@ -104,6 +109,42 @@ const AnthropicPage: FC = () => {
 		});
 	};
 
+	const createSessionMutation = useMutation<AnthropicSession, unknown, string>({
+		mutationFn: (agentId: string) =>
+			API.createAnthropicSession(organization, me.id, {
+				agent_id: agentId,
+				title: "Coder session tester",
+			}),
+		onSuccess: (session) => {
+			toast.success(`Anthropic session ${session.id} created.`);
+		},
+		onError: (error) => {
+			toast.error(
+				getErrorMessage(error, "Failed to create Anthropic session."),
+			);
+		},
+	});
+
+	const sendEventMutation = useMutation<
+		SendAnthropicEventResponse,
+		unknown,
+		{ sessionId: string; text: string }
+	>({
+		mutationFn: ({ sessionId, text }) =>
+			API.sendAnthropicEvent(organization, me.id, sessionId, { text }),
+		onSuccess: (response) => {
+			const id = response.events[0]?.id;
+			toast.success(
+				id
+					? `Sent event ${id} to Anthropic.`
+					: "Event sent, but Anthropic returned no event id.",
+			);
+		},
+		onError: (error) => {
+			toast.error(getErrorMessage(error, "Failed to send Anthropic event."));
+		},
+	});
+
 	const mutationError =
 		createMutation.error ?? updateMutation.error ?? deleteMutation.error;
 
@@ -120,9 +161,17 @@ const AnthropicPage: FC = () => {
 				agentsQuery.isFetching && agentsQuery.data !== undefined
 			}
 			agentsError={agentsQuery.error ?? undefined}
+			isCreatingSession={createSessionMutation.isPending}
+			createSessionError={createSessionMutation.error ?? undefined}
+			isSendingEvent={sendEventMutation.isPending}
+			sendEventError={sendEventMutation.error ?? undefined}
 			onSaveKey={saveKey}
 			onRemoveKey={removeKey}
 			onRefreshAgents={refreshAgents}
+			onCreateSession={(agentId) => createSessionMutation.mutateAsync(agentId)}
+			onSendEvent={(sessionId, text) =>
+				sendEventMutation.mutateAsync({ sessionId, text })
+			}
 		/>
 	);
 };

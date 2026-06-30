@@ -48,9 +48,29 @@ const meta: Meta<typeof AnthropicPageView> = {
 		agents: sampleAgents,
 		isLoadingAgents: false,
 		isRefreshingAgents: false,
+		isCreatingSession: false,
+		isSendingEvent: false,
 		onSaveKey: fn(),
 		onRemoveKey: fn(),
 		onRefreshAgents: fn(),
+		onCreateSession: fn(async () => ({
+			id: "sesn_01HSTORYBOOK",
+			agent_id: "agent_01HZ8K3CODER",
+			environment_id: "env_storybook",
+			title: "Coder session tester",
+			metadata: { coder_user_id: "00000000-0000-0000-0000-000000000000" },
+			created_at: "2026-06-30T19:00:00Z",
+			coder_user_id: "00000000-0000-0000-0000-000000000000",
+		})),
+		onSendEvent: fn(async () => ({
+			events: [
+				{
+					id: "sevt_01HSTORYBOOK",
+					type: "user.message",
+					processed_at: "2026-06-30T19:00:01Z",
+				},
+			],
+		})),
 	},
 };
 
@@ -144,5 +164,33 @@ export const KeySaveError: Story = {
 export const NoAgents: Story = {
 	args: {
 		agents: [],
+	},
+};
+
+/**
+ * Session-tester panel ready for a create+send round-trip. Render
+ * confirms the panel is mounted alongside the agents list whenever
+ * agents are available.
+ */
+export const SessionTesterReady: Story = {
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const sendButton = await canvas.findByRole("button", {
+			name: /send user message/i,
+		});
+		expect(sendButton).toBeDisabled();
+	},
+};
+
+/**
+ * Session-tester surfacing a send-event error from the backend so
+ * operators can iterate on payloads without leaving the page.
+ */
+export const SessionTesterSendError: Story = {
+	args: {
+		sendEventError: mockApiError({
+			message: "Anthropic rejected the send-event request.",
+			detail: "Cannot send events to archived session",
+		}),
 	},
 };

@@ -1896,6 +1896,19 @@ class ApiMethods {
 		return response.data;
 	};
 
+	sendAnthropicEvent = async (
+		organization: string,
+		userId: string,
+		sessionId: string,
+		request: TypesGen.SendAnthropicEventRequest,
+	): Promise<TypesGen.SendAnthropicEventResponse> => {
+		const response = await this.axios.post<TypesGen.SendAnthropicEventResponse>(
+			`/api/v2/anthropic/${encodeURIComponent(organization)}/sessions/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}/events`,
+			request,
+		);
+		return response.data;
+	};
+
 	getWorkspaceBuilds = async (
 		workspaceId: string,
 		req?: TypesGen.WorkspaceBuildsRequest,
